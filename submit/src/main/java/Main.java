@@ -1,70 +1,63 @@
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.api.java.function.Function;
-import org.apache.spark.api.java.function.Function2;
-import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SQLContext;
-import scala.Tuple2;
-
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.functions;
 
 public class Main {
-    public static void main(String[] args) throws IOException, URISyntaxException, InterruptedException {
-//        Thread.sleep(40000);
-        if(args.length < 4) {
-            throw new IllegalArgumentException("Owner, max_detail, input and output folder must be passed as arguments");
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            throw new IllegalArgumentException("Csv file path on the hdfs must be passed as argument");
         }
 
         String sparkMasterUrl = System.getenv("SPARK_MASTER_URL");
-        if(StringUtils.isBlank(sparkMasterUrl)) {
+        if (sparkMasterUrl == null || sparkMasterUrl.equals("")) {
             throw new IllegalStateException("SPARK_MASTER_URL environment variable must be set.");
         }
 
         String hdfsUrl = System.getenv("HDFS_URL");
-        if(StringUtils.isBlank(hdfsUrl)) {
+        if (hdfsUrl == null || hdfsUrl.equals("")) {
             throw new IllegalStateException("HDFS_URL environment variable must be set");
         }
 
-        String owner = args[0];
-        int maxDetail = Integer.parseInt(args[1]);
-        String inputArg = args[2];
-        if(!inputArg.endsWith("/")) { inputArg += "/"; }
-        String csvFile = hdfsUrl + inputArg + owner + ".csv";
-        String outputArg = args[3];
-        if(!outputArg.endsWith("/")) { outputArg += "/"; }
-        String outputPath = outputArg + owner;
+        String hdfsPath = args[0];
+        String csvFile = hdfsUrl + hdfsPath;
 
-        SparkConf sparkConf = new SparkConf().setAppName("BDE-SensorDemo").setMaster(sparkMasterUrl);
-        JavaSparkContext sparkContext = new JavaSparkContext(sparkConf);
-        SQLContext sqlContext = new SQLContext(sparkContext);
-        FileSystem hdfs = FileSystem.get(new URI(hdfsUrl), sparkContext.hadoopConfiguration());
+        SparkSession spark = SparkSession.builder().appName("BigData-1").master(sparkMasterUrl).getOrCreate();
+
+//        FileSystem hdfs = FileSystem.get(new URI(hdfsUrl), spark.conf());
 
         System.out.println("TESTING------------------------");
         System.out.println(sparkMasterUrl);
         System.out.println(hdfsUrl);
-        System.out.println(owner);
-        System.out.println(maxDetail);
         System.out.println(csvFile);
-        System.out.println(outputPath);
 
-        hdfs.close();
-        sparkContext.close();
-        sparkContext.stop();
+        Dataset<Row> dataSet = spark.read().option("header", "true").csv(csvFile);
+
+        ShowTrafficEventTypesCountByCityAndTimeSpan(dataSet);
+
+//        hdfs.close();
+        spark.stop();
+        spark.close();
+    }
+
+    static void ShowTrafficEventTypesCountByCityAndTimeSpan(Dataset<Row> ds) {
+        String city = "Salt Lake City";
+        String startTime = "2017-00-00 00:00:00";
+        String endTime = "2018-00-00 00:00:00";
+        int greaterThan = 500;
+
+        ds.filter(
+                ds.col("Source").equalTo("T")
+                        .and(ds.col("City").equalTo(city))
+                        .and(
+                                ds.col("StartTime(UTC)").gt(functions.lit(startTime))
+                                .and(ds.col("EndTime(UTC)")).lt(functions.lit(endTime))
+                        )
+        )
+                .groupBy("Type")
+                .agg(functions.count(ds.col("Type")))
+        .filter(functions.count(ds.col("Type").gt(greaterThan)))
+        .show()
+        ;
     }
 }
