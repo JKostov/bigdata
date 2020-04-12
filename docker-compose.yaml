@@ -1,7 +1,29 @@
 version: "3"
 
 services:
-  # Java submit
+  # BigData2 - Java spark streaming
+  streaming-consumer:
+    build: ./streaming-consumer
+    container_name: streaming-consumer
+    depends_on: 
+      - spark-master
+      - kafka
+      - mongo
+    environment: 
+      SPARK_MASTER_NAME: spark-master
+      SPARK_MASTER_PORT: 7077
+      MONGO_URL: mongodb://root:root1234@mongo:27017/database
+  streaming-producer:
+    build: ./streaming-producer
+    container_name: streaming-producer
+    depends_on: 
+      - namenode
+      - kafka
+    environment: 
+      HDFS_URL: hdfs://namenode:9000
+      APP_ARGS_CSV_FILE_PATH: /big-data/data.csv
+
+  # BigData1 - Java submit
   submit:
     build: ./submit
     container_name: submit
@@ -15,6 +37,21 @@ services:
       SPARK_MASTER_PORT: 7077
       SPARK_APPLICATION_ARGS: ''
       ENABLE_INIT_DAEMON: 'false'
+
+  # MongoDB
+  mongo:
+    image: jkostov/mongo:4.2
+    container_name: mongo
+    expose:
+      - "27017"
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=root1234
+      - MONGO_INITDB_DATABASE=database
 
   # KAFKA
   zookeeper:
@@ -119,3 +156,4 @@ volumes:
   hadoop_namenode:
   hadoop_datanode:
   hadoop_historyserver:
+  mongo_data:
