@@ -1,39 +1,82 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
+import java.io.*;
+import java.net.URI;
 import java.util.Properties;
-
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.fs.LocalFileSystem;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CommonConfigurationKeys;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 public class Main {
-    public static KafkaProducer producer;
+    private final static String Topic = "test";
 
     public static void main(String[] args) throws Exception {
 
-        String topic = "/user/user01/stream:ubers";
-        String fileName = "/user/user01/data/uber.csv";
-
-        if (args.length == 2) {
-            topic = args[0];
-            fileName = args[1];
-
+        System.out.println("RUNNING STREAMING-PRODUCER");
+        String initialSleepTime = System.getenv("INITIAL_SLEEP_TIME");
+        if (initialSleepTime != null && !initialSleepTime.equals("")) {
+            int sleep = Integer.parseInt(initialSleepTime);
+            System.out.println("Sleeping on start " + sleep + "sec");
+            Thread.sleep(sleep * 1000);
         }
-        System.out.println("Sending to topic " + topic);
-        configureProducer();
-        File f = new File(fileName);
-        FileReader fr = new FileReader(f);
-        BufferedReader reader = new BufferedReader(fr);
-        String line = reader.readLine();
-        while (line != null) {
 
-            ProducerRecord<String, String> rec = new ProducerRecord(topic,  line);
+        String hdfsUrl = System.getenv("HDFS_URL");
+        if (hdfsUrl == null || hdfsUrl.equals("")) {
+            throw new IllegalStateException("HDFS_URL environment variable must be set.");
+        }
+        String csvFilePath = System.getenv("CSV_FILE_PATH");
+        if (csvFilePath == null || csvFilePath.equals("")) {
+            throw new IllegalStateException("CSV_FILE_PATH environment variable must be set");
+        }
+        String kafkaUrl = System.getenv("KAFKA_URL");
+        if (kafkaUrl == null || kafkaUrl.equals("")) {
+            throw new IllegalStateException("KAFKA_URL environment variable must be set");
+        }
 
-            producer.send(rec);
-            System.out.println("Sent message: " + line);
-            line = reader.readLine();
-            Thread.sleep(600l);
+        KafkaProducer<String, String> producer = configureProducer(kafkaUrl);
 
+        Configuration conf = new Configuration();
+        conf.set(CommonConfigurationKeys.FS_DEFAULT_NAME_KEY, hdfsUrl);
+        conf.set("fs.hdfs.impl", DistributedFileSystem.class.getName());
+        conf.set("fs.file.impl", LocalFileSystem.class.getName());
+        FSDataInputStream inputStream = null;
+        FileSystem fs = null;
+        try {
+            fs = FileSystem.get(URI.create(hdfsUrl), conf);
+            Path inFile = new Path(csvFilePath);
+            inputStream = fs.open(inFile);
+            if (!fs.exists(inFile)) {
+                System.out.println("Input file not found");
+                throw new IOException("Input file not found");
+            }
+
+            String line = inputStream.readLine();
+            while(line != null) {
+                EventData tmp = EventData.CreateEventData(line);
+
+                if (tmp != null && tmp.getSource().equals(EventData.SOURCE_T)) {
+                    ProducerRecord<String, String> rec = new ProducerRecord<String, String>(Topic, line);
+                    producer.send(rec);
+                    System.out.println("[KAFKA DATA SENT}]: " + line);
+                    Thread.sleep(5 * 1000);
+                    System.out.println("Sleeping " + 5 + "sec");
+                }
+                line = inputStream.readLine();
+            }
+
+        } finally {
+            if (inputStream != null) {
+                inputStream.close();
+            }
+            if (fs != null) {
+                fs.close();
+            }
         }
 
         producer.close();
@@ -42,13 +85,12 @@ public class Main {
         System.exit(1);
     }
 
-    public static void configureProducer() {
+    public static KafkaProducer<String, String> configureProducer(String brokers) {
         Properties props = new Properties();
-        props.put("bootstrap.servers", "x.xx.xxx.xxx:9092");
-        props.put("metadata.broker.list", "x.xx.xxx.xxx:9091, x.xx.xxx.xxx:9092, x.xx.xxx.xxx:9093");
-        props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-        props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
-
-        producer = new KafkaProducer(props);
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokers);
+        props.put(ProducerConfig.CLIENT_ID_CONFIG, "streaming-producer");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+        return new KafkaProducer<String, String>(props);
     }
 }
