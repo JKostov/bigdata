@@ -10,13 +10,14 @@ services:
       - kafka
       - mongo
     environment: 
-      INITIAL_SLEEP_TIME: 3
+      INITIAL_SLEEP_TIME_IN_SECONDS: 30
       SPARK_MASTER_NAME: spark-master
       SPARK_MASTER_PORT: 7077
       SPARK_APPLICATION_ARGS: ''
       MONGO_URL: mongodb://root:root1234@mongo:27017/database
       KAFKA_URL: kafka:9092
       ENABLE_INIT_DAEMON: 'false'
+      DATA_RECEIVING_TIME_IN_SECONDS: 30
   streaming-producer:
     build: ./streaming-producer
     container_name: streaming-producer
@@ -24,10 +25,11 @@ services:
       - namenode
       - kafka
     environment:
-      INITIAL_SLEEP_TIME: 3
+      INITIAL_SLEEP_TIME_IN_SECONDS: 30
       HDFS_URL: hdfs://namenode:9000
       CSV_FILE_PATH: /big-data/data.csv
       KAFKA_URL: kafka:9092
+      DATA_SENDING_TIME_IN_SECONDS: 1
 
   # BigData1 - Java submit
 #  submit:

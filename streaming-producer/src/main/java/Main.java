@@ -19,7 +19,7 @@ public class Main {
     public static void main(String[] args) throws Exception {
 
         System.out.println("RUNNING STREAMING-PRODUCER");
-        String initialSleepTime = System.getenv("INITIAL_SLEEP_TIME");
+        String initialSleepTime = System.getenv("INITIAL_SLEEP_TIME_IN_SECONDS");
         if (initialSleepTime != null && !initialSleepTime.equals("")) {
             int sleep = Integer.parseInt(initialSleepTime);
             System.out.println("Sleeping on start " + sleep + "sec");
@@ -38,6 +38,11 @@ public class Main {
         if (kafkaUrl == null || kafkaUrl.equals("")) {
             throw new IllegalStateException("KAFKA_URL environment variable must be set");
         }
+        String dataSendingTimeInSeconds = System.getenv("DATA_SENDING_TIME_IN_SECONDS");
+        if (dataSendingTimeInSeconds == null || dataSendingTimeInSeconds.equals("")) {
+            throw new IllegalStateException("DATA_SENDING_TIME_IN_SECONDS environment variable must be set");
+        }
+        int dataSendingSleep = Integer.parseInt(dataSendingTimeInSeconds);
 
         KafkaProducer<String, String> producer = configureProducer(kafkaUrl);
 
@@ -63,9 +68,9 @@ public class Main {
                 if (tmp != null && tmp.getSource().equals(EventData.SOURCE_T)) {
                     ProducerRecord<String, String> rec = new ProducerRecord<String, String>(Topic, line);
                     producer.send(rec);
-                    System.out.println("[KAFKA DATA SENT}]: " + line);
-                    Thread.sleep(5 * 1000);
-                    System.out.println("Sleeping " + 5 + "sec");
+                    System.out.println("[KAFKA DATA SENT}]: " + tmp.getEventId());
+                    Thread.sleep(dataSendingSleep * 1000);
+                    System.out.println("Sleeping " + dataSendingSleep + "sec");
                 }
                 line = inputStream.readLine();
             }
