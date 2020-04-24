@@ -14,7 +14,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class Main {
-    private final static String Topic = "test";
+    private final static String Topic = "traffic-data";
 
     public static void main(String[] args) throws Exception {
 

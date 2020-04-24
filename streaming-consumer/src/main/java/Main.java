@@ -24,7 +24,7 @@ import scala.reflect.ClassTag;
 import org.apache.spark.api.java.Optional;
 
 public class Main {
-    private static String Topic = "test";
+    private static String Topic = "traffic-data";
 
     public static void main(String[] args) throws Exception {
 
