@@ -1,6 +1,22 @@
 version: "3"
 
 services:
+  # BigData1 - Java submit
+  submit:
+    build: ./submit
+    image: big-data_submit:latest
+    container_name: submit
+    depends_on:
+      - namenode
+      - spark-master
+    environment:
+      HDFS_URL: hdfs://namenode:9000
+      APP_ARGS_CSV_FILE_PATH: /big-data/data.csv
+      SPARK_MASTER_NAME: spark-master
+      SPARK_MASTER_PORT: 7077
+      SPARK_APPLICATION_ARGS: ""
+      ENABLE_INIT_DAEMON: "false"
+
   # SPARK
   spark-master:
     image: bde2020/spark-master:2.4.3-hadoop2.7
