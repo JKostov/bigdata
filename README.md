@@ -61,6 +61,9 @@ docker-compose up
 Contains traffic and weather events. This project is filtering and only using the traffic data. 
 raffic event is a spatiotemporal entity, where such an entity is associated with location and time. Following is the description of available traffic event types:
 
+[**Dataset desciption link**](https://smoosavi.org/datasets/lstw) - read the traffic data part only
+
+
 - **Accident**: Refers to traffic accident which can involve one or more vehicles.
 - **Broken-Vehicle**: Refers to the situation when there is one (or more) disabled vehicle(s) in a road.
 - **Congestion**: Refers to the situation when the speed of traffic is lower than the expected speed.
