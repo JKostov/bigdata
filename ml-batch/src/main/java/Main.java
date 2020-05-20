@@ -82,7 +82,7 @@ public class Main {
         // TODO: 1. Create model that contains eventIds and numbers for the type and severity - convert type and severity to int
         // TODO: 2. Save that model to the hdfs as csv file
         // TODO: 3. Download locally that file
-        // TODO: 4.Use that file for Python visualisation
+        // TODO: 4. Use that file for Python visualisation
         // TODO: 5. Create and train spark model with that Dataset
         groupedData.write().csv(hdfsUrl + "/big-data/data-new.csv");
         groupedData.show();
