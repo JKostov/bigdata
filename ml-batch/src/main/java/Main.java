@@ -7,6 +7,7 @@ import org.apache.spark.ml.linalg.Vectors;
 import org.apache.spark.ml.regression.LinearRegression;
 import org.apache.spark.ml.regression.LinearRegressionModel;
 import org.apache.spark.sql.*;
+import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.api.java.UDF4;
 import org.apache.spark.sql.expressions.UserDefinedFunction;
 import org.apache.spark.sql.types.DataTypes;
@@ -62,9 +63,17 @@ public class Main {
                 dataSet.col("City").as("W-City")
         );
 
-
         UDF4<String, String, String, String, Double> udfConvert = Main::distance;
         UserDefinedFunction getDistance = functions.udf(udfConvert, DataTypes.DoubleType);
+
+        UDF1<String, Integer> udfConvertTrafficType = Main::convertTrafficEventToNumber;
+        UserDefinedFunction getTrafficType = functions.udf(udfConvertTrafficType, DataTypes.IntegerType);
+
+        UDF1<String, Integer> udfConvertWeatherType = Main::convertWeatherEventToNumber;
+        UserDefinedFunction getWeatherType = functions.udf(udfConvertWeatherType, DataTypes.IntegerType);
+
+        UDF1<String, Integer> udfConvertSeverity = Main::convertSeverityToNumber;
+        UserDefinedFunction getSeverity = functions.udf(udfConvertSeverity, DataTypes.IntegerType);
 
         Dataset<Row> groupedData = traffic.join(weather,
                 traffic.col("City").equalTo(weather.col("W-City"))
@@ -72,58 +81,78 @@ public class Main {
                         .and(traffic.col("StartTime(UTC)").leq(weather.col("W-StartTime(UTC)")).and(traffic.col("EndTime(UTC)").geq(weather.col("W-EndTime(UTC)")))
                                 .or(weather.col("W-StartTime(UTC)").leq(traffic.col("StartTime(UTC)")).and(weather.col("W-EndTime(UTC)").geq(traffic.col("EndTime(UTC)")))))
         )
-//                .select(traffic.col("EventId"), weather.col("W-EventId"), traffic.col("LocationLat"), weather.col("W-LocationLat"), traffic.col("LocationLng"), weather.col("W-LocationLng"),
-//                        traffic.col("Street"), weather.col("W-Street"), traffic.col("StartTime(UTC)"), weather.col("W-StartTime(UTC)"), traffic.col("EndTime(UTC)"), weather.col("W-EndTime(UTC)"),
-//                        traffic.col("Type"), weather.col("W-Type"), traffic.col("Severity"), weather.col("W-Severity")
-//                );
-                .select(traffic.col("EventId"), weather.col("W-EventId"), traffic.col("Type"), weather.col("W-Type"), traffic.col("Severity"), weather.col("W-Severity")
+                .select(traffic.col("EventId"), weather.col("W-EventId"),
+                        getTrafficType.apply(traffic.col("Type")).as("TrafficType"), getWeatherType.apply(weather.col("W-Type")).as("WeatherType"),
+                        getSeverity.apply(traffic.col("Severity")).as("TrafficSeverity"),
+                        getSeverity.apply(weather.col("W-Severity")).as("WeatherSeverity")
                 );
 
-        // TODO: 1. Create model that contains eventIds and numbers for the type and severity - convert type and severity to int
-        // TODO: 2. Save that model to the hdfs as csv file
-        // TODO: 3. Download locally that file
-        // TODO: 4. Use that file for Python visualisation
-        // TODO: 5. Create and train spark model with that Dataset
-        groupedData.write().csv(hdfsUrl + "/big-data/data-new.csv");
-        groupedData.show();
-
-//        JavaRDD<Tuple2<String, String>> test = traffic.toJavaRDD().map(f -> {
-//            weather.filter(weather.col("LocationLat").equalTo(f.get(9)).and(weather.col("LocationLng").equalTo(f.get(10))));
-
-//            String qwe = "-1";
-//            boolean a = false;
-//            if (broadcastVar != null) {
-//                a = broadcastVar.value().isEmpty();
-//            } else {
-//                qwe = "NULL";
-//            }
-//
-//            if (a) {
-//                qwe = "EMPTY";
-//            }
-
-//            if (a.length() == 0) {
-//                return new Tuple2<>(f.getString(0), null);
-//            }
-//            return new Tuple2<>(f.getString(0), broadcastVar.value().get(0).getString(0));
-//        });
-
-//        JavaRDD<Row> javaRddRow = test.map(tup -> {
-//            String a = tup._1();
-//            String b = tup._2();
-//            return RowFactory.create(a, b);
-//        });
-//
-//        List<StructField> fields = new ArrayList<StructField>();
-//        fields.add(DataTypes.createStructField("TrafficEventId", DataTypes.StringType, true));
-//        fields.add(DataTypes.createStructField("WeatherEventId", DataTypes.StringType, true));
-//        StructType schema = DataTypes.createStructType(fields);
-//
-//        Dataset<Row> converted = spark.createDataFrame(javaRddRow, schema);
-//        converted.show(10000);
+        // TODO: train model
 
         spark.stop();
         spark.close();
+    }
+
+    public static int convertSeverityToNumber(String severity) {
+        if (severity == null) {
+            return 0;
+        }
+        switch (severity) {
+            case "Light":
+            case "Short":
+            case "Fast":
+                return 1;
+            case "Moderate":
+                return 2;
+            case "Heavy":
+                return 3;
+            case "Severe":
+            case "Slow":
+            case "Long":
+                return 4;
+            default:
+                return 0;
+        }
+    }
+
+    public static int convertTrafficEventToNumber(String trafficType) {
+        switch (trafficType) {
+            case "Accident":
+                return 0;
+            case "Broken-Vehicle":
+                return 1;
+            case "Congestion":
+                return 2;
+            case "Construction":
+                return 3;
+            case "Event":
+                return 4;
+            case "Lane-Blocked":
+                return 5;
+            case "Flow-Incident":
+                return 6;
+            default:
+                return -1;
+        }
+    }
+
+    public static int convertWeatherEventToNumber(String weatherType) {
+        switch (weatherType) {
+            case "Severe-Cold":
+                return 0;
+            case "Fog":
+                return 1;
+            case "Hail":
+                return 2;
+            case "Rain":
+                return 3;
+            case "Snow":
+                return 4;
+            case "Storm":
+                return 5;
+            default:
+                return 6;
+        }
     }
 
     public static double distance(String sLat1, String sLat2, String sLon1, String sLon2) {
@@ -145,15 +174,5 @@ public class Main {
         distanceInMeters = Math.pow(distanceInMeters, 2);
 
         return Math.sqrt(distanceInMeters);
-    }
-
-    static void ShowNumberOfAccidentsPerCity(Dataset<Row> ds) {
-
-        ds.filter(ds.col("Type").equalTo("Accident"))
-                .select(functions.unix_timestamp(functions.date_format(ds.col("StartTime(UTC)"), "yyyy-MM-01"), "yyyy-MM-dd").alias("Month"), ds.col("City"))
-                .groupBy("City", "Month")
-                .agg(functions.count("City").alias("NumberOfAccidentsPerMonth"))
-                .show()
-        ;
     }
 }
