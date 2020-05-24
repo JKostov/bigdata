@@ -1,24 +1,17 @@
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.broadcast.Broadcast;
-import org.apache.spark.ml.linalg.Vector;
-import org.apache.spark.ml.linalg.VectorUDT;
-import org.apache.spark.ml.linalg.Vectors;
-import org.apache.spark.ml.regression.LinearRegression;
-import org.apache.spark.ml.regression.LinearRegressionModel;
+import org.apache.spark.ml.Pipeline;
+import org.apache.spark.ml.PipelineModel;
+import org.apache.spark.ml.PipelineStage;
+import org.apache.spark.ml.classification.RandomForestClassifier;
+import org.apache.spark.ml.feature.VectorAssembler;
+import org.apache.spark.ml.feature.VectorIndexer;
+import org.apache.spark.ml.feature.VectorIndexerModel;
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.api.java.UDF4;
 import org.apache.spark.sql.expressions.UserDefinedFunction;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
-import org.apache.spark.sql.types.StructType;
-import scala.Tuple2;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import static org.apache.spark.sql.types.DataTypes.*;
 
 public class Main {
     public static void main(String[] args) {
@@ -75,19 +68,60 @@ public class Main {
         UDF1<String, Integer> udfConvertSeverity = Main::convertSeverityToNumber;
         UserDefinedFunction getSeverity = functions.udf(udfConvertSeverity, DataTypes.IntegerType);
 
+//        Dataset<Row> groupedData = traffic.join(weather,
+//                traffic.col("City").equalTo(weather.col("W-City"))
+//                        .and(getDistance.apply(traffic.col("LocationLat"), weather.col("W-LocationLat"), traffic.col("LocationLng"), weather.col("W-LocationLng")).leq(5000.0))
+//                        .and(traffic.col("StartTime(UTC)").leq(weather.col("W-StartTime(UTC)")).and(traffic.col("EndTime(UTC)").geq(weather.col("W-EndTime(UTC)")))
+//                                .or(weather.col("W-StartTime(UTC)").leq(traffic.col("StartTime(UTC)")).and(weather.col("W-EndTime(UTC)").geq(traffic.col("EndTime(UTC)")))))
+//        )
+//                .select(traffic.col("EventId"), weather.col("W-EventId"),
+//                        getTrafficType.apply(traffic.col("Type")).as("TrafficType"), getWeatherType.apply(weather.col("W-Type")).as("WeatherType"),
+//                        getSeverity.apply(traffic.col("Severity")).as("TrafficSeverity"),
+//                        getSeverity.apply(weather.col("W-Severity")).as("WeatherSeverity")
+//                );
+
         Dataset<Row> groupedData = traffic.join(weather,
                 traffic.col("City").equalTo(weather.col("W-City"))
                         .and(getDistance.apply(traffic.col("LocationLat"), weather.col("W-LocationLat"), traffic.col("LocationLng"), weather.col("W-LocationLng")).leq(5000.0))
                         .and(traffic.col("StartTime(UTC)").leq(weather.col("W-StartTime(UTC)")).and(traffic.col("EndTime(UTC)").geq(weather.col("W-EndTime(UTC)")))
                                 .or(weather.col("W-StartTime(UTC)").leq(traffic.col("StartTime(UTC)")).and(weather.col("W-EndTime(UTC)").geq(traffic.col("EndTime(UTC)")))))
         )
-                .select(traffic.col("EventId"), weather.col("W-EventId"),
-                        getTrafficType.apply(traffic.col("Type")).as("TrafficType"), getWeatherType.apply(weather.col("W-Type")).as("WeatherType"),
-                        getSeverity.apply(traffic.col("Severity")).as("TrafficSeverity"),
-                        getSeverity.apply(weather.col("W-Severity")).as("WeatherSeverity")
+                .select(
+                        getTrafficType.apply(traffic.col("Type")).as("TrafficType"),
+                        getWeatherType.apply(weather.col("W-Type")).as("WeatherType"),
+                        getSeverity.apply(weather.col("W-Severity")).as("WeatherSeverity"),
+                        weather.col("W-LocationLat").cast(DoubleType).as("Lat"),
+                        weather.col("W-LocationLng").cast(DoubleType).as("Lng")
                 );
 
+        VectorAssembler vectorAssembler = new VectorAssembler()
+                .setInputCols(new String[]{"WeatherType", "WeatherSeverity", "Lat", "Lng"})
+                .setOutputCol("Features");
+
+        Dataset<Row> transformed = vectorAssembler.transform(groupedData);
+
         // TODO: train model
+        Dataset<Row>[] splits = transformed.randomSplit(new double[]{0.7, 0.3});
+        Dataset<Row> trainingData = splits[0];
+        Dataset<Row> testData = splits[1];
+        VectorIndexerModel featureIndexer = new VectorIndexer()
+                .setInputCol("Features")
+                .setOutputCol("indexedFeatures")
+                .setMaxCategories(4)
+                .fit(transformed);
+
+        RandomForestClassifier rf = new RandomForestClassifier()
+                .setLabelCol("TrafficType")
+                .setFeaturesCol("indexedFeatures");
+
+
+        Pipeline pipeline = new Pipeline()
+                .setStages(new PipelineStage[]{vectorAssembler, featureIndexer, rf});
+
+        PipelineModel model = pipeline.fit(trainingData);
+
+        Dataset<Row> predictions = model.transform(testData);
+        predictions.show(100);
 
         spark.stop();
         spark.close();
