@@ -104,19 +104,17 @@ public class Main {
         Dataset<Row>[] splits = transformed.randomSplit(new double[]{0.7, 0.3});
         Dataset<Row> trainingData = splits[0];
         Dataset<Row> testData = splits[1];
-        VectorIndexerModel featureIndexer = new VectorIndexer()
-                .setInputCol("Features")
-                .setOutputCol("indexedFeatures")
-                .setMaxCategories(4)
-                .fit(transformed);
+//        VectorIndexerModel featureIndexer = new VectorIndexer()
+//                .setInputCol("Features")
+//                .setOutputCol("indexedFeatures")
+//                .fit(transformed);
 
         RandomForestClassifier rf = new RandomForestClassifier()
                 .setLabelCol("TrafficType")
-                .setFeaturesCol("indexedFeatures");
-
+                .setFeaturesCol("Features");
 
         Pipeline pipeline = new Pipeline()
-                .setStages(new PipelineStage[]{vectorAssembler, featureIndexer, rf});
+                .setStages(new PipelineStage[]{rf});
 
         PipelineModel model = pipeline.fit(trainingData);
 
