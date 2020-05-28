@@ -1,10 +1,7 @@
-import org.apache.spark.ml.Pipeline;
-import org.apache.spark.ml.PipelineModel;
-import org.apache.spark.ml.PipelineStage;
+import org.apache.spark.ml.classification.RandomForestClassificationModel;
 import org.apache.spark.ml.classification.RandomForestClassifier;
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator;
 import org.apache.spark.ml.feature.VectorAssembler;
-import org.apache.spark.ml.feature.VectorIndexer;
-import org.apache.spark.ml.feature.VectorIndexerModel;
 import org.apache.spark.sql.*;
 import org.apache.spark.sql.api.java.UDF1;
 import org.apache.spark.sql.api.java.UDF4;
@@ -68,18 +65,6 @@ public class Main {
         UDF1<String, Integer> udfConvertSeverity = Main::convertSeverityToNumber;
         UserDefinedFunction getSeverity = functions.udf(udfConvertSeverity, DataTypes.IntegerType);
 
-//        Dataset<Row> groupedData = traffic.join(weather,
-//                traffic.col("City").equalTo(weather.col("W-City"))
-//                        .and(getDistance.apply(traffic.col("LocationLat"), weather.col("W-LocationLat"), traffic.col("LocationLng"), weather.col("W-LocationLng")).leq(5000.0))
-//                        .and(traffic.col("StartTime(UTC)").leq(weather.col("W-StartTime(UTC)")).and(traffic.col("EndTime(UTC)").geq(weather.col("W-EndTime(UTC)")))
-//                                .or(weather.col("W-StartTime(UTC)").leq(traffic.col("StartTime(UTC)")).and(weather.col("W-EndTime(UTC)").geq(traffic.col("EndTime(UTC)")))))
-//        )
-//                .select(traffic.col("EventId"), weather.col("W-EventId"),
-//                        getTrafficType.apply(traffic.col("Type")).as("TrafficType"), getWeatherType.apply(weather.col("W-Type")).as("WeatherType"),
-//                        getSeverity.apply(traffic.col("Severity")).as("TrafficSeverity"),
-//                        getSeverity.apply(weather.col("W-Severity")).as("WeatherSeverity")
-//                );
-
         Dataset<Row> groupedData = traffic.join(weather,
                 traffic.col("City").equalTo(weather.col("W-City"))
                         .and(getDistance.apply(traffic.col("LocationLat"), weather.col("W-LocationLat"), traffic.col("LocationLng"), weather.col("W-LocationLng")).leq(5000.0))
@@ -100,26 +85,27 @@ public class Main {
 
         Dataset<Row> transformed = vectorAssembler.transform(groupedData);
 
-        // TODO: train model
         Dataset<Row>[] splits = transformed.randomSplit(new double[]{0.7, 0.3});
         Dataset<Row> trainingData = splits[0];
         Dataset<Row> testData = splits[1];
-//        VectorIndexerModel featureIndexer = new VectorIndexer()
-//                .setInputCol("Features")
-//                .setOutputCol("indexedFeatures")
-//                .fit(transformed);
 
         RandomForestClassifier rf = new RandomForestClassifier()
                 .setLabelCol("TrafficType")
                 .setFeaturesCol("Features");
 
-        Pipeline pipeline = new Pipeline()
-                .setStages(new PipelineStage[]{rf});
-
-        PipelineModel model = pipeline.fit(trainingData);
+        RandomForestClassificationModel model = rf.fit((trainingData));
 
         Dataset<Row> predictions = model.transform(testData);
         predictions.show(100);
+
+        MulticlassClassificationEvaluator evaluator = new MulticlassClassificationEvaluator()
+                .setLabelCol("TrafficType")
+                .setPredictionCol("predic+tion")
+                .setMetricName("accuracy");
+
+        double accuracy = evaluator.evaluate(predictions);
+        System.out.println("Accuracy = " + accuracy);
+        System.out.println("Test Error = " + (1.0 - accuracy));
 
         spark.stop();
         spark.close();
