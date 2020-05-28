@@ -8,10 +8,12 @@ import org.apache.spark.sql.api.java.UDF4;
 import org.apache.spark.sql.expressions.UserDefinedFunction;
 import org.apache.spark.sql.types.DataTypes;
 
+import java.io.IOException;
+
 import static org.apache.spark.sql.types.DataTypes.*;
 
 public class Main {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         if (args.length < 1) {
             throw new IllegalArgumentException("Csv file path on the hdfs must be passed as argument");
         }
@@ -106,6 +108,8 @@ public class Main {
         double accuracy = evaluator.evaluate(predictions);
         System.out.println("Accuracy = " + accuracy);
         System.out.println("Test Error = " + (1.0 - accuracy));
+
+        model.save(hdfsUrl + "/ml-model");
 
         spark.stop();
         spark.close();
