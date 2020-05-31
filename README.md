@@ -123,3 +123,11 @@ For running the second project you have to use the following command
 This script inside is using the `docker-compose-2.yaml` file.
 
 # Big-data 3 - Spark ML project
+
+Implementation of the third project is in the `ml-batch` folder. It is using SparkML.
+- First the data is filtered by type traffic or weather
+- Then weather events are join with the traffic events by date time and location within 5km
+- The grouped data is transformed so it can be used for a ML training and it is split in 70% for training the ML model and 30% for predictions
+- RandomForestClassificationModel is trained
+- The model is using `WeatherType`, `WeatherSeverity`, `Latitude` and `Longitude` to predict Traffic event type
+- After that evalutaion of the predictions is done and the result is that the model is 70% accurate.

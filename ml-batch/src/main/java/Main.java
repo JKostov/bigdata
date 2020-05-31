@@ -102,7 +102,7 @@ public class Main {
 
         MulticlassClassificationEvaluator evaluator = new MulticlassClassificationEvaluator()
                 .setLabelCol("TrafficType")
-                .setPredictionCol("predic+tion")
+                .setPredictionCol("prediction")
                 .setMetricName("accuracy");
 
         double accuracy = evaluator.evaluate(predictions);
