@@ -109,8 +109,6 @@ public class Main {
         System.out.println("Accuracy = " + accuracy);
         System.out.println("Test Error = " + (1.0 - accuracy));
 
-        model.save(hdfsUrl + "/ml-model");
-
         spark.stop();
         spark.close();
     }
