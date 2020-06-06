@@ -14,7 +14,12 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class Main {
-    private final static String Topic = "traffic-data";
+    private final static String TrafficTopic = "traffic-data";
+    private final static String WeatherTopic = "weather-data";
+
+    private final static String PrimaryTrafficEvent = "T";
+    private final static String PrimaryWeatherEvent = "W";
+    private final static String AllEvents = "A";
 
     public static void main(String[] args) throws Exception {
 
@@ -26,6 +31,11 @@ public class Main {
             Thread.sleep(sleep * 1000);
         }
 
+        String primaryEventType = System.getenv("PRIMARY_EVENT_TYPE");
+        if (primaryEventType == null || primaryEventType.equals("") || (!primaryEventType.equals(PrimaryTrafficEvent) && !primaryEventType.equals(PrimaryWeatherEvent) && !primaryEventType.equals(AllEvents))) {
+            primaryEventType = "T";
+            System.out.println("Sending Traffic event by default");
+        }
         String hdfsUrl = System.getenv("HDFS_URL");
         if (hdfsUrl == null || hdfsUrl.equals("")) {
             throw new IllegalStateException("HDFS_URL environment variable must be set.");
@@ -65,10 +75,18 @@ public class Main {
             while(line != null) {
                 EventData tmp = EventData.CreateEventData(line);
 
-                if (tmp != null && tmp.getSource().equals(EventData.SOURCE_T)) {
-                    ProducerRecord<String, String> rec = new ProducerRecord<String, String>(Topic, line);
+                if (tmp != null && !primaryEventType.equals(PrimaryWeatherEvent) && tmp.getSource().equals(EventData.SOURCE_T)) {
+                    ProducerRecord<String, String> rec = new ProducerRecord<String, String>(TrafficTopic, line);
                     producer.send(rec);
-                    System.out.println("[KAFKA DATA SENT}]: " + tmp.getEventId());
+                    System.out.println("[KAFKA TRAFFIC DATA SENT}]: " + tmp.getEventId());
+                    Thread.sleep(dataSendingSleep * 1000);
+                    System.out.println("Sleeping " + dataSendingSleep + "sec");
+                }
+
+                if (tmp != null && !primaryEventType.equals(PrimaryTrafficEvent) && tmp.getSource().equals(EventData.SOURCE_W)) {
+                    ProducerRecord<String, String> rec = new ProducerRecord<String, String>(WeatherTopic, line);
+                    producer.send(rec);
+                    System.out.println("[KAFKA WEATHER DATA SENT}]: " + tmp.getEventId());
                     Thread.sleep(dataSendingSleep * 1000);
                     System.out.println("Sleeping " + dataSendingSleep + "sec");
                 }

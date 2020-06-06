@@ -32,7 +32,7 @@ public class Main {
         String csvFile = hdfsUrl + hdfsPath;
 
         // .config("spark.executor.memory", "10g")
-        SparkSession spark = SparkSession.builder().appName("BigData-3").master(sparkMasterUrl).getOrCreate();
+        SparkSession spark = SparkSession.builder().appName("BigData-3-ML-Saving").master(sparkMasterUrl).getOrCreate();
 
         Dataset<Row> dataSet = spark.read().option("header", "true").csv(csvFile);
 
@@ -96,6 +96,8 @@ public class Main {
                 .setFeaturesCol("Features");
 
         RandomForestClassificationModel model = rf.fit((trainingData));
+
+        model.save(hdfsPath + "/big-data/ml-model");
 
         Dataset<Row> predictions = model.transform(testData);
         predictions.show(100);

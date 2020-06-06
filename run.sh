@@ -22,9 +22,9 @@ then
   PROJECT="1"
 fi
 
-if [ $PROJECT != "1" -a $PROJECT != "2" -a $PROJECT != "3" ]
+if [ $PROJECT != "1" -a $PROJECT != "2" -a $PROJECT != "3" -a $PROJECT != "4" ]
 then
-  echo "[ERROR]: Project can be: 1 or 2 or 3"
+  echo "[ERROR]: Project can be: 1 or 2 or 3 or 4"
   exit 0
 fi
 
