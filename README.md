@@ -49,12 +49,13 @@ docker-compose up
 ```
 
 - Wait for all containers to start then run the next command
-- pass argument as the project number 1 or 2 or 3
+- pass argument as the project number 1 or 2 or 3 or 4
 ```
 ./run.sh
 ./run.sh 1
 ./run.sh 2
 ./run.sh 3
+./run.sh 4
 ```
 
 # Dataset
@@ -131,3 +132,7 @@ Implementation of the third project is in the `ml-batch` folder. It is using Spa
 - RandomForestClassificationModel is trained
 - The model is using `WeatherType`, `WeatherSeverity`, `Latitude` and `Longitude` to predict Traffic event type
 - After that evalutaion of the predictions is done and the result is that the model is 70% accurate.
+
+# Big-data 4 - Spark ML with streaming project
+
+Implementation of the last project is in the `ml-streaming` folder. It is using SparkML trained model to predict values that are coming from kafka topic. After the third projects trains the model with the dataset, it saves the model on the hadoop HDFS. This projects is loading that model and using it to predict values from a stream.
